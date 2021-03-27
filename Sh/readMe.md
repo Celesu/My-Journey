@@ -1,0 +1,1 @@
+I will change this later, but if you want to know more about the problems, you can access them from this [link](https://assessment.hackerearth.com/challenges/test/shopee-singapore-test-draft-3/problems/)
