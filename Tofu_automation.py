@@ -56,7 +56,7 @@ async def on_ready():
 
 async def retrieve_msg(channel_id):
     headers = {
-        "authorization": "ODYyMTM4OTE0MDkyMzUxNTIw.Ya8TLg.RZm3kFNSsP4apB6Xzmj7s09og7I" #ini untuk akses akun discord
+        "authorization": "your discord acc token" #ini untuk akses akun discord
     }
     r = requests.get('https://discord.com/api/v9/channels/'+str(channel_id)+'/messages?limit=10', headers=headers) # Pembeda hanya
     #/channel/cahnnel_id/....
@@ -73,7 +73,7 @@ async def retrieve_msg(channel_id):
 
 async def retrieve_the_msg(channel_id, val_id):
     headers = {
-        "authorization": "ODYyMTM4OTE0MDkyMzUxNTIw.Ya8TLg.RZm3kFNSsP4apB6Xzmj7s09og7I" #ini untuk akses akun discord
+        "authorization": "your discord acc token" #ini untuk akses akun discord
     }
     r = requests.get('https://discord.com/api/v9/channels/'+channel_id+'/messages?limit=100', headers=headers) # Pembeda hanya
     #/channel/cahnnel_id/....
