@@ -423,7 +423,7 @@ async def on_message(message):
                   
 keep_alive() 
 
-TOKEN = os.environ.get("DISCORD_BOT_SECRET")
+TOKEN = os.environ.get("DISCORD_BOT_SECRET") # your bot token
 
 client.run(TOKEN)
 # rencana              
