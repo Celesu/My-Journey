@@ -1,1 +1,1 @@
-I will change this later, but if you want to know more about the problems, you can access them from this [link](https://assessment.hackerearth.com/challenges/test/shopee-singapore-test-draft-3/problems/).
+This is the challenge that I took from Shopee code challenge. To know more about this challenge, you can find out more in this [link](https://assessment.hackerearth.com/challenges/test/shopee-singapore-test-draft-3/problems/).
