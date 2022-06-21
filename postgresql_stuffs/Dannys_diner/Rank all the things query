@@ -1,0 +1,22 @@
+-- SHOW search_path;
+SET search_path TO dannys_diner;
+
+SELECT s.customer_id, s.order_date, m.product_name, m.price,
+CASE WHEN (ms.customer_id IS NOT NULL AND s.order_date >= ms.join_date) 
+	THEN 'Y'
+	ELSE 'N'
+	END AS "member",
+
+CASE WHEN s.order_date >= ms.join_date AND ms.customer_id IS NOT NULL 
+	THEN RANK() OVER(
+					PARTITION BY(CASE WHEN s.order_date >= ms.join_date AND ms.customer_id IS NOT NULL
+								THEN s.customer_id
+								ELSE NULL END)
+					ORDER BY s.order_date)
+	ELSE NULL
+	END AS "ranking"
+	
+FROM sales AS s
+INNER JOIN menu m ON s.product_id = m.product_id
+FULL OUTER JOIN members ms ON s.customer_id = ms.customer_id
+ORDER BY s.customer_id, s.order_date, m.product_name;

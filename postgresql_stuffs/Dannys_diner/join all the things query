@@ -1,0 +1,11 @@
+-- SHOW search_path;
+-- SET search_path TO dannys_diner;
+
+SELECT s.customer_id, s.order_date, m.product_name, m.price,
+CASE WHEN (ms.customer_id IS NOT NULL and s.order_date >= ms.join_date) THEN 'Y'
+ELSE 'N'
+END AS "member"
+FROM sales AS s
+INNER JOIN menu m ON s.product_id = m.product_id
+FULL OUTER JOIN members ms ON s.customer_id = ms.customer_id
+ORDER BY s.customer_id, s.order_date, m.product_name;

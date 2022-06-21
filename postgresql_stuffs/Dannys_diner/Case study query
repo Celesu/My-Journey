@@ -1,0 +1,161 @@
+SET search_path TO dannys_diner;
+
+-- 1. What is the total amount each customer spent at the restaurant?
+-- Each customer from A to C, respectively, spent $76, $74, and $36 at the
+-- the restaurant.
+SELECT sa.customer_id, SUM(me.price) AS "total amount" FROM sales sa
+INNER JOIN menu me ON sa.product_id = me.product_id
+GROUP BY sa.customer_id
+ORDER BY sa.customer_id;
+
+-- 2. How many days has each customer visited the restaurant?
+-- Each customer from A to C respectively, has already visited the restaurant
+-- for 6, 6, and 3 times.
+SELECT customer_id, COUNT(order_date) AS "total visit" FROM sales
+GROUP BY customer_id
+ORDER BY customer_id;
+
+-- 3. What was the first item from the menu purchased by each customer?
+-- The first item they purchased respectively was curry, curry, and ramen.
+;WITH temp_table AS
+(SELECT sa.customer_id, sa.order_date, me.product_name, ROW_NUMBER() OVER(
+	PARTITION BY sa.customer_id
+	ORDER BY sa.order_date
+) AS "rank" FROM sales sa
+	  JOIN menu me ON sa.product_id = me.product_id
+)
+
+SELECT * FROM temp_table
+WHERE rank = 1;
+
+-- 4. What is the most purchased item on the menu and how many times 
+--    was it purchased by all customers?
+--    it's ramen, and each customer respectively purchased it for 3, 2, and
+--    3 times.
+;WITH purchases
+AS
+( -- My temporary table
+SELECT me.product_id, COUNT(sa.product_id) AS "times_purchased" FROM sales sa
+INNER JOIN menu me ON sa.product_id = me.product_id
+GROUP BY me.product_id
+)
+
+SELECT sa.customer_id, COUNT(
+CASE WHEN sa.product_id = max_purchased.product_id THEN sa.product_id 
+END
+) AS "times purchased" 
+FROM sales sa
+INNER JOIN menu me ON sa.product_id = me.product_id
+JOIN
+	(
+	SELECT purchases.product_id, purchases.times_purchased FROM purchases 
+	WHERE purchases.times_purchased = 
+		(SELECT MAX(times_purchased) FROM purchases)
+	) AS max_purchased ON max_purchased.product_id = sa.product_id
+GROUP BY sa.customer_id
+ORDER BY sa.customer_id;
+
+-- 5. Which item was the most popular for each customer?
+--    For each customer, respectively, the most popular 
+--    items are ramen, curry, and ramen.
+;WITH temp_table
+AS
+( -- My temporary table
+SELECT sa.customer_id, me.product_name, COUNT(sa.product_id) AS "times_purchased" FROM sales sa
+INNER JOIN menu me ON sa.product_id = me.product_id
+GROUP BY sa.customer_id, me.product_name
+ORDER BY sa.customer_id, me.product_name
+),
+
+temp_table_2 AS
+(
+SELECT *, ROW_NUMBER() OVER(
+			PARTITION BY customer_id
+			ORDER BY times_purchased DESC) AS fav
+FROM temp_table
+)
+
+SELECT * FROM temp_table_2
+WHERE fav=1;
+-- 6. Which item was purchased first by the customer after they 
+--	  became a member?
+--    After they became a member, customer A's first purchase was curry
+--    and customer B's first purchase was ramen.
+
+-- 1st solution, using DISTINCT ON 
+SELECT DISTINCT ON (mem.customer_id)
+		mem.customer_id, me.product_name 
+FROM sales sa
+JOIN menu me ON sa.product_id = me.product_id
+JOIN members mem ON sa.customer_id = mem.customer_id
+WHERE sa.order_date >= mem.join_date
+ORDER BY mem.customer_id, me.product_name;
+-- 2nd solution, using temp table then rank
+;WITH the_temp
+AS
+(
+	SELECT mem.customer_id, me.product_name, 
+		ROW_NUMBER() OVER(PARTITION BY mem.customer_id
+							ORDER BY sa.order_date) AS "rank"
+	FROM sales sa
+	JOIN menu me ON sa.product_id = me.product_id
+	JOIN members mem ON sa.customer_id = mem.customer_id
+	WHERE sa.order_date >= mem.join_date
+)
+SELECT customer_id, product_name FROM the_temp
+WHERE rank = 1;
+
+-- 7. Which item was purchased just before the customer became a member?
+--    Before they became a member, Customer A purchased sushi and curry
+--    and customer B purchased sushi and 2 curries.
+SELECT mem.customer_id, sa.order_date, me.product_name
+FROM sales sa
+JOIN menu me ON sa.product_id = me.product_id
+JOIN members mem ON sa.customer_id = mem.customer_id
+WHERE sa.order_date < mem.join_date
+ORDER BY mem.customer_id;
+
+-- 8. What is the total items and amount spent for each member before 
+-- 	  they became a member?
+--    Before they became a member, Customer A spent $25 to purchase 2 items,
+--    and Customer B spent $40 to purchase 3 items.
+SELECT DISTINCT(mem.customer_id), count(sa.product_id), sum(me.price)
+FROM sales sa
+JOIN menu me ON sa.product_id = me.product_id
+JOIN members mem ON sa.customer_id = mem.customer_id
+WHERE sa.order_date < mem.join_date
+GROUP BY mem.customer_id
+ORDER BY mem.customer_id;
+
+-- 9. If each $1 spent equates to 10 points and sushi has a 2x points 
+-- 	  multiplier - how many points would each customer have?
+--    From customer A to C, respectively, and with the given condition
+--    they have 86, 94, and 36 points.
+SELECT sa.customer_id, SUM(
+	CASE WHEN me.product_name = 'sushi' then me.price*2
+	ELSE me.price
+END) AS "Points" 
+FROM sales sa
+JOIN menu me ON sa.product_id = me.product_id
+GROUP BY sa.customer_id;
+
+-- 10. In the first week after a customer joins the program 
+--     (including their join date) they earn 2x points on all items, 
+--     not just sushi - how many points do customer A and B have at 
+--     the end of January?
+--     With the given conditions, customer A has 137 points and
+--     customer B has 94 points at the end of January.
+SELECT sa.customer_id, SUM(
+	CASE WHEN (sa.customer_id IN(
+			SELECT DISTINCT(customer_id) FROM members
+	) AND sa.order_date BETWEEN mem.join_date AND mem.join_date+7) 
+			THEN me.price*2
+		WHEN me.product_name = 'sushi' THEN me.price*2
+		ELSE me.price
+END) AS "Points" 
+FROM sales sa
+JOIN menu me ON sa.product_id = me.product_id
+-- Use FULL JOIN if you wanna appear customer_id 'C' in the table.
+JOIN members mem ON sa.customer_id = mem.customer_id
+WHERE sa.order_date < '2021-02-01'
+GROUP BY sa.customer_id;
