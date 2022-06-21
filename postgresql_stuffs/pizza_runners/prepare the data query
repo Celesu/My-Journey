@@ -1,0 +1,28 @@
+SET search_path TO pizza_runner;
+
+CREATE TABLE IF NOT EXISTS runner_orders_updated AS
+(SELECT order_id, runner_id, pickup_time, distance, duration,
+CASE WHEN (cancellation IS NULL OR 
+		   cancellation = 'null' OR
+		   cancellation = '') THEN 'delivered'
+	ELSE cancellation
+	END AS "status"
+FROM runner_orders);
+
+CREATE TABLE IF NOT EXISTS customer_orders_updated AS
+(SELECT order_id, customer_id, pizza_id,
+CASE WHEN (exclusions = '' OR
+		   exclusions = 'null' OR
+		   exclusions IS NULL) THEN '0'
+	ELSE exclusions
+	END AS "exclusions_",
+CASE WHEN (extras = '' OR
+		  extras = 'null' OR
+		  extras IS NULL) THEN '0'
+	ELSE extras
+	END AS "extras_"
+FROM customer_orders)
+
+-- SELECT * FROM pizza_names;
+-- SELECT * FROM pizza_recipes;
+-- SELECT * FROM pizza_toppings;

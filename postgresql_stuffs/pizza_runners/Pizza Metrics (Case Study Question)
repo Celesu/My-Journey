@@ -1,0 +1,131 @@
+SET search_path TO pizza_runner;
+
+-- A. Pizza Metrics
+
+-- 1. How many pizzas were ordered?
+--    There were 14 pizzas ordered.
+SELECT COUNT(pizza_id) FROM customer_orders;
+
+-- 2. How many unique customer orders were made?
+--    There were 5 unique customer orders.
+SELECT COUNT(DISTINCT(customer_id)) FROM customer_orders;
+
+-- 3. How many successful orders were delivered by each runner?
+--	  There were 8 successful orders delivered. Runner '1' delivered pizzas
+--    4 times, runner '2' deliverd pizzas 3 times, and runner '3' deliverd 
+--    pizzas once.
+SELECT DISTINCT(runner_id), COUNT(order_id) FROM runner_orders
+WHERE pickup_time <> 'null'
+GROUP BY runner_id
+ORDER BY runner_id;
+
+-- 4. How many of each type of pizza was delivered?
+--    Pizza type '1' was delivered 7 times and pizza type '2' was 
+--    delivered 3 times.
+;WITH temp_table AS(
+SELECT DISTINCT(order_id), pizza_id FROM customer_orders
+)
+
+SELECT co.pizza_id, count(co.pizza_id) FROM temp_table co
+LEFT JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE ro.pickup_time <> 'null'
+GROUP BY co.pizza_id
+ORDER BY co.pizza_id;
+
+-- 5. How many Vegetarian and Meatlovers were ordered by each customer?
+-- 
+;WITH temp_table AS(
+SELECT DISTINCT(order_id), customer_id, pizza_id FROM customer_orders
+)
+
+SELECT co.customer_id, co.pizza_id, COUNT(co.pizza_id) FROM temp_table co
+LEFT JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE ro.pickup_time <> 'null'
+GROUP BY co.customer_id, co.pizza_id
+ORDER BY co.customer_id, co.pizza_id;
+
+-- 6. What was the maximum number of pizzas delivered in a single order?
+--    The maximum number of pizzas deliverd in a single order was 3.
+;WITH temp_table AS
+(
+SELECT co.order_id, COUNT(co.order_id) AS "count_" FROM customer_orders co
+JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE ro.pickup_time <> 'null'
+GROUP BY co.order_id
+),
+
+temp_table_2 AS (
+SELECT order_id, count_, RANK() OVER(
+	ORDER BY count_ DESC
+) AS "rank_" FROM temp_table
+)
+
+SELECT * FROM temp_table_2
+WHERE rank_ = 1;
+
+-- 7. For each customer, how many delivered pizzas had at least 1 change 
+--    and how many had no changes?
+--	  Starting with customer 101, they had no changes to their delivered pizzas.
+--    Thesame goes for customers 102 and 105. For customer 103, 
+--    they had 3 pizzas with changes and for customer 104, they had a pizza
+--    with a change on their pizzas.
+CREATE TABLE IF NOT EXISTS customer_orders_updated AS
+(SELECT order_id, customer_id, pizza_id,
+CASE WHEN (exclusions = '' OR
+		   exclusions = 'null' OR
+		   exclusions IS NULL) THEN '0'
+	ELSE exclusions
+	END AS "exclusions_",
+CASE WHEN (extras = '' OR
+		  extras = 'null' OR
+		  extras IS NULL) THEN '0'
+	ELSE extras
+	END AS "extras_"
+FROM customer_orders);
+
+SELECT co.customer_id, 
+CASE WHEN co.exclusions_ = '0' THEN 0
+	ELSE COUNT(co.exclusions_) 
+	END AS "number_changes"
+FROM customer_orders_updated co
+JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE ro.pickup_time <> 'null' 
+GROUP BY co.customer_id, co.exclusions_
+ORDER BY co.customer_id;
+
+-- 8. How many pizzas were delivered that had both exclusions and extras?
+--    There were only 2 pizzas that had both exclusions and extras.
+;WITH temp_table AS (
+SELECT 
+CASE WHEN co.exclusions_ <> '0' AND co.extras_ <> '0' THEN count(co.exclusions_) 
+	END AS "both_"
+FROM customer_orders_updated co 
+JOIN runner_orders ro ON co.order_id = ro.order_id
+GROUP BY co.exclusions_, co.extras_
+)
+
+SELECT SUM(both_) AS "Total_of_both" FROM temp_table;
+
+-- 9. What was the total volume of pizzas ordered for each hour of the day?
+--	 The total volume was 3, which happened on 1 p.m, 6 p.m, and 9 p.m and the
+--   total volume was 1, which happened on 11 a.m and 7 p.m.
+;WITH temp_table AS(
+SELECT EXTRACT('hour' FROM order_time) "hour", COUNT(EXTRACT('hour' FROM order_time)) "vol" 
+FROM customer_orders
+GROUP BY order_time
+)
+
+SELECT hour, SUM(vol) FROM temp_table
+GROUP BY hour
+ORDER BY SUM(vol) DESC, hour;
+
+-- 10. What was the volume of orders for each day of the week?
+--     The volume of orders for each day was 5 on Wednesday and Saturday,
+--     3 on Thursday, and 1 on Friday.
+SELECT To_Char(DATE(order_time), 'Day') "day",  COUNT(DATE(order_time)) "vol"
+FROM customer_orders
+GROUP BY day
+ORDER BY vol DESC, day DESC;
+
+-- CLEAR -- 
+
