@@ -1,6 +1,107 @@
 SET search_path TO pizza_runner;
 
 -- 1. How many runners signed up for each 1 week period? (i.e. week starts 2021-01-01)
---
+--	  For the first week, there are 2 runners signed up; for the second week,
+--    there is 1 runner signed up; and for the third week, there is 1 runner
+--	  signed up.
 
-SELECT * FROM runners;
+-- this is for my knowledge
+-- DO $$
+-- DECLARE earliest_date date = (SELECT MIN(registration_date) FROM runners);
+-- DECLARE latest_date date = (SELECT MAX(registration_date) FROM runners);
+-- BEGIN
+-- 	RAISE NOTICE 'earliest date: %', latest_date;
+-- 	RAISE NOTICE 'latest date: %', earliest_date;
+-- END$$;
+
+SELECT To_Char(DATE(registration_date), 'W') "week", COUNT(DATE(registration_date))
+FROM runners
+GROUP BY week
+ORDER BY week ASC;
+
+-- 2. What was the average time in minutes it took for each runner to 
+--	  arrive at the Pizza Runner HQ to pickup the order?
+--	  I'm not sure with my answer in this case, but for the first runner, their
+-- 	  average time to arrive at the HQ is 43.67 minutes; the second runner is
+--	  35.6 minutes; and the third runner is 49 minutes.
+SELECT ro.runner_id, ROUND(AVG(To_Char(AGE(co.order_time, ro.pickup_time::timestamp)::time, 'MI')::numeric), 2) AS "AVERGE" from customer_orders co
+JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE pickup_time <> 'null'
+GROUP BY ro.runner_id
+ORDER BY ro.runner_id;
+
+-- 3. Is there any relationship between the number of pizzas and how long 
+-- 	  the order takes to prepare?
+-- 	  After looking at the table, even if the order was just one pizza, 
+--    the durations are variable, from an interval of 15 minutes until 
+--    32 minutes, and when the order was two pizzas, the duration was 10 minutes 
+-- 	  and 20 minutes, so the relationship between them is very low. 
+-- 	  (I need to prove this using a statistical method)
+
+SELECT co.order_id, count(co.pizza_id), ro.duration FROM customer_orders co
+JOIN runner_orders ro ON co.order_id = ro.order_id
+WHERE ro.duration <> 'null'
+GROUP BY co.order_id, ro.duration;
+
+-- 4. What was the average distance travelled for each customer?
+-- 	  The average distance travelled for customer id '101' was 20km,
+-- 	  customer id '102' was 16.73km, customer id '103' was 23.4km, 
+--    customer id '104' was 10km, and customer id '105' was 25km.
+;WITH tmp_tab AS(
+SELECT (regexp_matches(distance, '\d+(?:\.\d+)?','g'))[1]::numeric AS "distance", order_id FROM runner_orders_updated
+WHERE distance <> 'null')
+
+SELECT co.customer_id, ROUND(AVG(ro.distance), 2) avg_distance FROM customer_orders_updated co
+JOIN tmp_tab ro ON co.order_id = ro.order_id
+GROUP BY co.customer_id
+ORDER BY co.customer_id;
+
+-- 5. What was the difference between the longest and shortest 
+-- 	  delivery times for all orders?
+-- 	  the difference was 30 minutes.
+;WITH tmp_tab AS(
+SELECT order_id, (regexp_matches(duration, '\d+(?:\.\d+)?','g'))[1]::numeric AS "duration" FROM runner_orders_updated
+WHERE distance <> 'null')
+
+SELECT (MAX(duration)-MIN(duration)) difference_of_the_time FROM tmp_tab
+
+-- 6. What was the average speed for each runner for each delivery and do you 
+-- 	  notice any trend for these values?
+--	  The average speed for each runner starts from runner_id '1' until '3'
+--    was 0.76 km/min, 1.05 km/min, and 0.67 km/min. While the trend for runner_id
+--    '1' is fluctuative, and for runner_id '2', it is increasing from time to time,
+--    and for runner_id '3', there's no trend because they just delivered a pizza.
+;WITH tmp_tab AS(
+SELECT runner_id, (regexp_matches(duration, '\d+(?:\.\d+)?','g'))[1]::numeric AS "duration",
+(regexp_matches(distance, '\d+(?:\.\d+)?','g'))[1]::numeric AS "distance" FROM runner_orders_updated
+WHERE distance <> 'null')
+
+SELECT runner_id, ROUND(AVG(distance/duration), 2) "speed" FROM tmp_tab
+GROUP BY runner_id
+ORDER BY runner_id;
+
+;WITH tmp_tab AS(
+SELECT runner_id, (regexp_matches(duration, '\d+(?:\.\d+)?','g'))[1]::numeric AS "duration",
+(regexp_matches(distance, '\d+(?:\.\d+)?','g'))[1]::numeric AS "distance" FROM runner_orders_updated
+WHERE distance <> 'null'
+ORDER BY pickup_time)
+
+SELECT runner_id, ROUND(distance/duration, 2) "speed" FROM tmp_tab
+ORDER BY runner_id;
+
+-- 7. What is the successful delivery percentage for each runner?
+-- 	  The successful delivery percentage for runner_id 1 is 100%,
+--	  for runner_id 2 is 75%, and for runner_id 3 is 50%.
+
+WITH all_tmp AS(
+SELECT runner_id, count(runner_id)::numeric "total_deliv" FROM runner_orders
+GROUP BY runner_id),
+no_null AS(
+SELECT runner_id, count(runner_id)::numeric "success_deliv" FROM runner_orders
+WHERE distance <> 'null'
+GROUP BY runner_id)
+
+SELECT al.runner_id, ROUND((nn.success_deliv/al.total_deliv), 2) "% successful delivery" FROM all_tmp al
+JOIN no_null nn ON al.runner_id = nn.runner_id
+
+
